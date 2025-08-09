@@ -1,0 +1,69 @@
+# Archiver
+
+Archiver is a Swift Package that is similar to `NSKeyedArchiver` but isn't restricted to `NSObject`s. 
+
+The key advantage of using Archiver over `Codable` is support for inheritance which `Codable` has no support for and will likely never have support for.
+
+Archiver takes inspiration from a few existing approaches:
+- `NSKeyedArchiver` - Supports serialising subclasses and stores the type (class name) of each object.
+- Swift Data - Uses a macro `@Archivable` to synthesise `decode` methods. Requires a schema of all of the types used in the archive to determine subclasses for decoding.
+- `Codable` - Uses an `Archivable` protocol for decoding.
+
+The motivation for Archiver is for it to be a minimial implementation to support archiving and unarchiving objects. It is not designed to be conform to arbitrary formats. It is highly opinionated in that respect. Even though extra features could be added, the goal is to keep the implementation minimal as a demonstration of the minimum required to support archiving subclasses.
+
+The Archiver produces a dictionary. This can then be converted to a file format. For example the dictionary can be passed to `JSONSerialization` to produce JSON, and it can unarchive from a JSON object produced by `JSONSerialization`. There are also convenience `jsonEncode` and `jsonDecode` functions provided.
+
+## Usage
+
+```swift
+import Foundation
+import Archiver
+
+// Models
+
+@Archivable
+class Container {
+    var components: [Component] = []
+    
+    required init() {}
+}
+
+@Archivable
+class Component {
+    var x: Double = 0
+    var y: Double = 0
+    
+    required init() {}
+}
+
+@Archivable
+class Button: Component {
+    var label: String = ""
+    
+    required init() {}
+}
+
+@Archivable
+class Field: Component {
+    var placeholder: String = ""
+    
+    required init() {}
+}
+
+// Create objects
+var container = Container()
+var button = Button()
+button.label = "Click here"
+container.components.append(button)
+var field = Field()
+field.placeholder = "First name"
+container.components.append(field)
+
+// Archive to JSON
+var json = Archiver.jsonEncode(container)
+print(json)
+
+// Unarchive from JSON
+var container = Archiver.jsonDecode(objType: Container.self, schema: [Container.self, Component.self, Button.self, Field.self], json: json)
+```
+

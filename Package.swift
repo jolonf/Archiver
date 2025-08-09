@@ -43,6 +43,7 @@ let package = Package(
         .testTarget(
             name: "ArchiverTests",
             dependencies: [
+                "Archiver",
                 "ArchiverMacros",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]
