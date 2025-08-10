@@ -14,9 +14,6 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
                                  conformingTo protocols: [SwiftSyntax.TypeSyntax], in context: some SwiftSyntaxMacros.MacroExpansionContext) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
         // Get the type's name from `type`
         let typeName = type.description
-        // Create the extension syntax
-        //let extensionDecl = try SyntaxParser.parse(source: "extension \(typeName): Archivable {}").statements.first?.item.as(ExtensionDeclSyntax.self)
-        
         let extensionDecl = ExtensionDeclSyntax(
             extensionKeyword: .keyword(.extension),
             extendedType: TypeSyntax(stringLiteral: typeName),
@@ -32,8 +29,7 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
                 rightBrace: .rightBraceToken()
             )
         )
-        
-        return [extensionDecl] //.map { [$0] } ?? []
+        return [extensionDecl]
     }
     
     public static func expansion(
@@ -58,16 +54,11 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             return nil
         }
         let assignments = propertyNamesAndTypes.map { (name, type) in
-            //if type.hasPrefix("[") && type.hasSuffix("]") {
-                //let elementType = String(type.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-                return """
-                if let value = archive["\(name)"] {
-                    self.\(name) = try Archiver.decode(type: \(type).self, from: value, schema: schema)
-                }
-                """
-            //} else {
-            //    return "if let value = archive[\"\(name)\"] as? \(type) { self.\(name) = value }"
-            //}
+            return """
+            if let value = archive["\(name)"] {
+                self.\(name) = try Archiver.decode(type: \(type).self, from: value, schema: schema)
+            }
+            """
         }.joined(separator: "\n")
         let decodeFunc = """
         public func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
@@ -76,38 +67,12 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
         """
         return [DeclSyntax(stringLiteral: decodeFunc)]
     }
-    
-
-}
-
-
-/// Implementation of the `stringify` macro, which takes an expression
-/// of any type and produces a tuple containing the value of that expression
-/// and the source code that produced the value. For example
-///
-///     #stringify(x + y)
-///
-///  will expand to
-///
-///     (x + y, "x + y")
-public struct StringifyMacro: ExpressionMacro {
-    public static func expansion(
-        of node: some FreestandingMacroExpansionSyntax,
-        in context: some MacroExpansionContext
-    ) -> ExprSyntax {
-        guard let argument = node.arguments.first?.expression else {
-            fatalError("compiler bug: the macro does not have any arguments")
-        }
-
-        return "(\(argument), \(literal: argument.description))"
-    }
 }
 
 @main
 struct ArchiverPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         ArchivableMacro.self,
-        StringifyMacro.self,
     ]
 }
 

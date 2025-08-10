@@ -10,44 +10,11 @@ import Archiver
 import ArchiverMacros
 
 let testMacros: [String: Macro.Type] = [
-    "stringify": StringifyMacro.self,
     "Archivable": ArchivableMacro.self
 ]
 #endif
 
 final class ArchiverTests: XCTestCase {
-    func testMacro() throws {
-        #if canImport(ArchiverMacros)
-        assertMacroExpansion(
-            """
-            #stringify(a + b)
-            """,
-            expandedSource: """
-            (a + b, "a + b")
-            """,
-            macros: testMacros
-        )
-        #else
-        throw XCTSkip("macros are only supported when running tests for the host platform")
-        #endif
-    }
-
-    func testMacroWithStringLiteral() throws {
-        #if canImport(ArchiverMacros)
-        assertMacroExpansion(
-            #"""
-            #stringify("Hello, \(name)")
-            """#,
-            expandedSource: #"""
-            ("Hello, \(name)", #""Hello, \(name)""#)
-            """#,
-            macros: testMacros
-        )
-        #else
-        throw XCTSkip("macros are only supported when running tests for the host platform")
-        #endif
-    }
-    
     func testArchivableMacroExpansion() throws {
         #if canImport(ArchiverMacros)
         assertMacroExpansion(
@@ -81,22 +48,6 @@ final class ArchiverTests: XCTestCase {
         throw XCTSkip("macros are only supported when running tests for the host platform")
         #endif
     }
-
-    // MARK: - Schema tests
-//    func testCreateSchema() {
-//        let types: [ArchivableClass] = [Container.self, Component.self, Button.self, Field.self]
-//        let schema = Archiver.createSchema(from: types)
-////        print("Inheritance Schema:")
-////        for (superId, subclasses) in schema {
-////            let subclassNames = subclasses.map { String(describing: $0) }
-////            print("Superclass: \(superId) => Subclasses: \(subclassNames)")
-////        }
-//        // Example assertion: Check that Component's subclasses include Component, Button, Field
-//        let componentSubclasses = schema["Component"]?.map { String(describing: $0) } ?? []
-//        XCTAssertTrue(componentSubclasses.contains("Component"), "Component should be its own subclass")
-//        XCTAssertTrue(componentSubclasses.contains("Button"), "Button should be a subclass of Component")
-//        XCTAssertTrue(componentSubclasses.contains("Field"), "Field should be a subclass of Component")
-//    }
 }
 
 // MARK: - Test Models
