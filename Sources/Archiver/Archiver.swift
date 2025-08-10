@@ -25,7 +25,7 @@ public enum ArchiverError: Error {
 
 public typealias ArchivableClass = (Archivable & AnyObject).Type
 
-public typealias ArchivableSchema = [String: [ArchivableClass]]
+public typealias ArchivableSchema = [String: ArchivableClass]
 
 public protocol Archivable: AnyObject {
     init()
@@ -44,7 +44,7 @@ public class Archiver {
         let schema = createSchema(from: types)
         switch deser {
         case let dict as [String: Any]:
-            return try decode(objType: objType, from: dict, schema: schema)
+            return try decode(type: objType, from: dict, schema: schema)
         default:
             throw ArchiverError.unknownType(message: "Expected an object")
         }
@@ -123,46 +123,56 @@ public class Archiver {
 
     // MARK: - Decode
     
-    /// Polymorphic decode
-    public static func decode<T: Archivable>(objType: T.Type, from archive: [String: Any], schema: ArchivableSchema) throws -> T {
-        let className = String(describing: objType)
-        if let typeName = archive[typeDiscriminator] as? String,
-           let subclasses = schema[className] {
-            // Note this class will have been added as one of the subclasses
-            for subclass in subclasses {
-                if typeName == String(describing: subclass) {
-                    // If the type is actually this class (not a subclass)
-                    // then instantiate the object here
-                    if typeName == className {
-                        let obj = objType.init()
-                        try obj.decode(from: archive, schema: schema)
-                        return obj
-                    } else {
-                        return try decode(objType: subclass, from: archive, schema: schema) as! T
-                    }
-                }
+    /// Convenience form of `decode(from:schema:)` that casts to `T`
+    public static func decode<T>(type: T.Type, from value: Any, schema: ArchivableSchema) throws -> T {
+        return try decode(from: value, schema: schema) as! T
+    }
+
+    public static func decode(from value: Any, schema: ArchivableSchema) throws -> Any {
+        switch value {
+        case let value as String:
+            return value
+        case let value as Int:
+            return value
+        case let value as Double:
+            return value
+        case let dict as [String: Any]:
+            // The dict may be an object or it may be just a dict
+            if let className = dict[typeDiscriminator] as? String {
+                // Object
+                return try decodeObject(from: dict, schema: schema)
+            } else {
+                // Dict
+                return value
             }
-            throw ArchiverError.unknownType(message: "No type matching `\(typeName)` found in schema")
-        } else {
-            throw ArchiverError.unknownType(message: "No type descriminator found '\(typeDiscriminator)' in archive")
+        case let array as [Any]:
+            var decodedArray: [Any] = []
+            try array.enumerated().forEach { (index, element) in
+                decodedArray.append(try decode(type: Any.self, from: element, schema: schema))
+            }
+            return decodedArray
+        default:
+            throw ArchiverError.unknownType(message: "Data type not supported for value: \(value)")
         }
     }
     
-    /// Form superclass to subclasses mapping.
-    /// All classes will be added into the superclass keys.
-    /// All superclasses will have themselves as a subclass, e.g.
-    ///   Component => [Component, Button, Field]
-    ///   Button => [Button]
-    ///   Field => [Field]
+    /// Polymorphic decode
+    public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> AnyObject {
+        if let typeName = archive[typeDiscriminator] as? String,
+           let type = schema[typeName] {
+            var obj = type.init()
+            try obj.decode(from: archive, schema: schema)
+            return obj
+        } else {
+            throw ArchiverError.unknownType(message: "Class not found in schema")
+        }
+    }
+    
     public static func createSchema(from types: [ArchivableClass]) -> ArchivableSchema {
         var schema: ArchivableSchema = [:]
         for type in types {
             let typeName = String(describing: type)
-            schema[typeName, default: []].append(type)
-            if let superclass = (type as AnyClass).superclass(), superclass is Archivable.Type {
-                let superclassName = String(describing: superclass)
-                schema[superclassName, default: []].append(type)
-            }
+            schema[typeName] = type
         }
         return schema
     }

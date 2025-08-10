@@ -6,7 +6,36 @@ import SwiftSyntaxMacros
 
 /// Implementation of the `@Archivable` macro. When attached to a class, it:
 /// - Synthesizes a `decode(from:schema:)` method that decodes the object's properties from a dictionary.
-public struct ArchivableMacro: MemberMacro {
+public struct ArchivableMacro: MemberMacro, ExtensionMacro {
+    
+    public static func expansion(of node: SwiftSyntax.AttributeSyntax,
+                                 attachedTo declaration: some SwiftSyntax.DeclGroupSyntax,
+                                 providingExtensionsOf type: some SwiftSyntax.TypeSyntaxProtocol,
+                                 conformingTo protocols: [SwiftSyntax.TypeSyntax], in context: some SwiftSyntaxMacros.MacroExpansionContext) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
+        // Get the type's name from `type`
+        let typeName = type.description
+        // Create the extension syntax
+        //let extensionDecl = try SyntaxParser.parse(source: "extension \(typeName): Archivable {}").statements.first?.item.as(ExtensionDeclSyntax.self)
+        
+        let extensionDecl = ExtensionDeclSyntax(
+            extensionKeyword: .keyword(.extension),
+            extendedType: TypeSyntax(stringLiteral: typeName),
+            inheritanceClause: InheritanceClauseSyntax(
+                colon: .colonToken(),
+                inheritedTypes: InheritedTypeListSyntax {
+                    InheritedTypeSyntax(type: TypeSyntax(stringLiteral: "Archivable"))
+                }
+            ),
+            memberBlock: MemberBlockSyntax(
+                leftBrace: .leftBraceToken(),
+                members: MemberBlockItemListSyntax([]),
+                rightBrace: .rightBraceToken()
+            )
+        )
+        
+        return [extensionDecl] //.map { [$0] } ?? []
+    }
+    
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf decl: some DeclGroupSyntax,
@@ -29,8 +58,17 @@ public struct ArchivableMacro: MemberMacro {
             return nil
         }
         let assignments = propertyNamesAndTypes.map { (name, type) in
-            "if let value = archive[\"\(name)\"] as? \(type) { self.\(name) = value }"
-        }.joined(separator: "\n        ")
+            //if type.hasPrefix("[") && type.hasSuffix("]") {
+                //let elementType = String(type.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+                return """
+                if let value = archive["\(name)"] {
+                    self.\(name) = try Archiver.decode(type: \(type).self, from: value, schema: schema)
+                }
+                """
+            //} else {
+            //    return "if let value = archive[\"\(name)\"] as? \(type) { self.\(name) = value }"
+            //}
+        }.joined(separator: "\n")
         let decodeFunc = """
         public func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
             \(assignments)
@@ -39,13 +77,7 @@ public struct ArchivableMacro: MemberMacro {
         return [DeclSyntax(stringLiteral: decodeFunc)]
     }
     
-//    public static func expansion(
-//        of node: AttributeSyntax,
-//        providingConformancesOf decl: some DeclGroupSyntax,
-//        in context: some MacroExpansionContext
-//    ) throws -> [TypeSyntax] {
-//        return [TypeSyntax(stringLiteral: "Archivable")]
-//    }
+
 }
 
 
@@ -78,3 +110,4 @@ struct ArchiverPlugin: CompilerPlugin {
         StringifyMacro.self,
     ]
 }
+
