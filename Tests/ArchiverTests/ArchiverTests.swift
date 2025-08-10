@@ -74,26 +74,17 @@ enum ButtonType {
     case toggle
 }
 
+@Archivable
 class Button: Component {
     var type: ButtonType = .push
     var label: String = ""
     
     required init() {}
-
-    override func decode(from archive: [String : Any], schema: ArchivableSchema) throws {
-        try super.decode(from: archive, schema: schema)
-        self.label = archive["label"] as! String
-    }
 }
 
 class Field: Component {
     var placeholder: String = ""
     
     required init() {}
-
-    override func decode(from json: [String : Any], schema: ArchivableSchema) throws {
-        try super.decode(from: json, schema: schema)
-        self.placeholder = json["placeholder"] as! String
-    }
 }
 

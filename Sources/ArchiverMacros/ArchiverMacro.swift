@@ -53,6 +53,7 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             }
             return nil
         }
+
         let assignments = propertyNamesAndTypes.map { (name, type) in
             return """
             if let value = archive["\(name)"] {
@@ -60,9 +61,25 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             }
             """
         }.joined(separator: "\n")
+        
+        // Superclass detection (simple version)
+        let superclassType: String? = {
+            guard let inheritance = classDecl.inheritanceClause else { return nil }
+            for inheritedType in inheritance.inheritedTypes {
+                let supertype = inheritedType.type.description.trimmingCharacters(in: .whitespaces)
+                if supertype != "Archivable" {
+                    return supertype
+                }
+            }
+            return nil
+        }()
+        // Assume superclass conforms to Archivable if present and not NSObject
+        let hasArchivableSuper: Bool = (superclassType != nil && superclassType != "NSObject")
+        let superCall = hasArchivableSuper ? "try super.decode(from: archive, schema: schema)\n" : ""
+        let overrideStr = hasArchivableSuper ? "override " : ""
         let decodeFunc = """
-        public func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
-            \(assignments)
+        public \(overrideStr)func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
+            \(superCall)\(assignments)
         }
         """
         return [DeclSyntax(stringLiteral: decodeFunc)]
