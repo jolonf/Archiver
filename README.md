@@ -22,7 +22,23 @@ import Archiver
 // Models
 
 @Archivable
+struct App {
+    var container: Container = Container()
+    var preferences: Preferences = Preferences()
+        
+    init() {}
+}
+
+@Archivable
+struct Preferences {
+    var reopenWindows: Bool = true
+    
+    init() {}
+}
+
+@Archivable
 class Container {
+    var title: String = ""
     var components: [Component] = []
     
     required init() {}
@@ -37,7 +53,18 @@ class Component {
 }
 
 @Archivable
+enum ButtonType: String {
+    case push
+    case toggle
+
+    init() {
+        self = .push // Default value is required otherwise won't compile
+    }
+}
+
+@Archivable
 class Button: Component {
+    var type: ButtonType = .push
     var label: String = ""
     
     required init() {}
@@ -51,20 +78,57 @@ class Field: Component {
 }
 
 // Create objects
-var container = Container()
+var app = App()
 var button = Button()
+button.type = .toggle
 button.label = "Click here"
-container.components.append(button)
+app.container.title = "Main"
+app.container.components.append(button)
 var field = Field()
-field.placeholder = "First name"
-container.components.append(field)
+field.placeholder = "Type here"
+app.container.components.append(field)
+app.preferences.reopenWindows = false
 
 // Archive to JSON
-var json = Archiver.jsonEncode(container)
+var json = Archiver.jsonEncode(app)
 print(json)
 
 // Unarchive from JSON
-var container = Archiver.jsonDecode(objType: Container.self, schema: ArchivableSchema([Container.self, Component.self, Button.self, Field.self]), json: json)
+var app = Archiver.jsonDecode(objType: App.self, schema: ArchivableSchema([App.self, Preferences.self, Container.self, Component.self, ButtonType.self, Button.self, Field.self]), json: json)
+```
+
+Example JSON created from the above example:
+
+```json
+{
+  "_$type" : "App",
+  "container" : {
+    "_$type" : "Container",
+    "components" : [
+      {
+        "_$type" : "Button",
+        "label" : "Click here",
+        "type" : {
+          "_$type" : "ButtonType",
+          "rawValue" : "toggle"
+        },
+        "x" : 0,
+        "y" : 0
+      },
+      {
+        "_$type" : "Field",
+        "placeholder" : "Type here",
+        "x" : 0,
+        "y" : 0
+      }
+    ],
+    "title" : "Main"
+  },
+  "preferences" : {
+    "_$type" : "Preferences",
+    "reopenWindows" : false
+  }
+}
 ```
 
 ## Core Concepts
