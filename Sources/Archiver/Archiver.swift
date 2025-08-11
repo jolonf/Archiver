@@ -40,14 +40,14 @@ public class Archiver {
         }
     }
     
-    public static func jsonEncode(_ obj: AnyObject, options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]) throws -> Data {
+    public static func jsonEncode(_ obj: Archivable, options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]) throws -> Data {
         let archive = try encode(obj: obj)
         return try JSONSerialization.data(withJSONObject: archive, options: options)
     }
 
     // MARK: - Encode
 
-    public static func encode(obj: AnyObject) throws -> [String: Any] {
+    public static func encode(obj: Archivable) throws -> [String: Any] {
         return try encode(objMirror: Mirror(reflecting: obj))
     }
 
@@ -74,13 +74,6 @@ public class Archiver {
                     } else {
                         return // No property created for nil values
                     }
-                // Enums
-                } else if valueMirror.displayStyle == .enum {
-                    if let rawRepresentable = child.value as? any RawRepresentable {
-                        value = rawRepresentable.rawValue
-                    } else {
-                        value = String(describing: child.value)
-                    }
                 } else {
                     value = child.value
                 }
@@ -99,17 +92,27 @@ public class Archiver {
             return value
         case let value as Double:
             return value
-        // TODO: - Dictionary
+        case let value as any RawRepresentable:
+            var archive: [String: Any] = [:]
+            archive[typeDiscriminator] = String(describing: type(of: value))
+            archive["rawValue"] = try encode(value: value.rawValue)
+            return archive
+        case let dict as [String: Any]:
+            var archiveDict: [String: Any] = [:]
+            try dict.forEach { (key, value) in
+                archiveDict[key] = try encode(value: value)
+            }
+            return archiveDict
         case let array as [Any]:
             var archiveArray: [Any] = []
             try array.enumerated().forEach { (index, element) in
                 archiveArray.append(try encode(value: element))
             }
             return archiveArray
-        case let obj as AnyObject:
+        case let obj as Archivable:
             return try encode(obj: obj)
         default:
-            throw ArchiverError.unknownType(message: "Data type not supported \(value)")
+            throw ArchiverError.unknownType(message: "Data type not supported encoding for value: `\(value)`")
         }
     }
 
@@ -152,13 +155,16 @@ public class Archiver {
     
     /// Polymorphic decode
     public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> Archivable {
-        if let typeName = archive[typeDiscriminator] as? String,
-           let type = schema[typeName] {
-            var obj = type.init()
-            try obj.decode(from: archive, schema: schema)
-            return obj
+        if let typeName = archive[typeDiscriminator] as? String {
+            if let type = schema[typeName] {
+                var obj = type.init()
+                try obj.decode(from: archive, schema: schema)
+                return obj
+            } else {
+                throw ArchiverError.unknownType(message: "Class `\(typeName)` not found in schema")
+            }
         } else {
-            throw ArchiverError.unknownType(message: "Class not found in schema")
+            throw ArchiverError.unknownType(message: "Dictionary does not contain key \(typeDiscriminator)")
         }
     }
     

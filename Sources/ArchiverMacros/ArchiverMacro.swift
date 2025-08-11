@@ -34,23 +34,20 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
         return [extensionDecl]
     }
     
+    /// Synthesize decode(from:schema:)
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf decl: some DeclGroupSyntax,
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // Synthesize decode(from:schema:)
+        var superCall = ""   // added for subclasses of already conforming Archivables
+        var overrideStr = "" // added for subclasses of already conforming Archivables
+        var mutatingStr = "" // added for structs
         
-        var superCall = ""
-        var overrideStr = ""
-        var mutatingStr = ""
-        
-        let memberBlock: MemberBlockSyntax
+        let assignments: String
         
         if let classDecl = decl.as(ClassDeclSyntax.self) {
-            memberBlock = classDecl.memberBlock
-            
             // Superclass detection (simple version)
             let superclassType: String? = {
                 guard let inheritance = classDecl.inheritanceClause else { return nil }
@@ -66,13 +63,35 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             let hasArchivableSuper: Bool = (superclassType != nil && superclassType != "NSObject")
             superCall = hasArchivableSuper ? "try super.decode(from: archive, schema: schema)\n" : ""
             overrideStr = hasArchivableSuper ? "override " : ""
+            assignments = propertyAssignments(memberBlock: classDecl.memberBlock)
         } else if let structDecl = decl.as(StructDeclSyntax.self) {
-            memberBlock = structDecl.memberBlock
             mutatingStr = "mutating "
+            assignments = propertyAssignments(memberBlock: structDecl.memberBlock)
+        } else if let enumDecl = decl.as(EnumDeclSyntax.self) {
+            mutatingStr = "mutating "
+            let typeName = enumDecl.name.text
+            assignments = """
+            if let rawArchive = archive["rawValue"] {
+                let raw = try Archiver.decode(type: RawValue.self, from: rawArchive, schema: schema)
+                if let type = \(typeName)(rawValue: raw) {
+                    self = type
+                }
+            }
+            """
         } else {
             return []
         }
-        
+
+        let decodeFunc = """
+        public \(mutatingStr)\(overrideStr)func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
+            \(superCall)\(assignments)
+        }
+        """
+        return [DeclSyntax(stringLiteral: decodeFunc)]
+    }
+    
+    /// Generates code to decode and assign dictionary values to property members.
+    public static func propertyAssignments(memberBlock: MemberBlockSyntax) -> String {
         let propertyNamesAndTypes: [(String, String)] = memberBlock.members.compactMap { (member) -> (String, String)? in
             guard let varDecl = member.decl.as(VariableDeclSyntax.self),
                   let binding = varDecl.bindings.first,
@@ -86,8 +105,6 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             }
             return nil
         }
-
-        // TODO: Add support for Enums, e.g. if let type = archive["type"] as? String, let type = ButtonType(rawValue: type)
         
         let assignments = propertyNamesAndTypes.map { (name, type) in
             return """
@@ -96,13 +113,8 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             }
             """
         }.joined(separator: "\n")
-
-        let decodeFunc = """
-        public \(mutatingStr)\(overrideStr)func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
-            \(superCall)\(assignments)
-        }
-        """
-        return [DeclSyntax(stringLiteral: decodeFunc)]
+        
+        return assignments
     }
 }
 

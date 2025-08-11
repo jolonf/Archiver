@@ -52,7 +52,7 @@ final class ArchiverTests: XCTestCase {
     func testArchivableRoundTripEncodeDecode() throws {
         // Create and set up the objects
         let button = Button()
-        //button.type = .toggle
+        button.type = .toggle
         button.label = "Test Button"
         button.x = 10.5
         button.y = 20.5
@@ -70,7 +70,7 @@ final class ArchiverTests: XCTestCase {
         let json = try Archiver.jsonEncode(container)
         
         // JSON decode: build schema
-        let schema: [Archivable.Type] = [Container.self, Component.self, Button.self, Field.self]
+        let schema: [Archivable.Type] = [Container.self, Component.self, Button.self, ButtonType.self, Field.self]
         let decoded = try Archiver.jsonDecode(objType: Container.self, schema: schema, json: json)
         
         // Check root object
@@ -82,7 +82,7 @@ final class ArchiverTests: XCTestCase {
             XCTFail("First component should be Button")
             return
         }
-        //XCTAssertEqual(decodedButton.type, .toggle)
+        XCTAssertEqual(decodedButton.type, .toggle)
         XCTAssertEqual(decodedButton.label, "Test Button")
         XCTAssertEqual(decodedButton.x, 10.5)
         XCTAssertEqual(decodedButton.y, 20.5)
@@ -116,14 +116,20 @@ class Component {
     required init() {}
 }
 
+@Archivable
 enum ButtonType: String {
     case push
     case toggle
+    
+    init() {
+        self = .push
+    }
+    
 }
 
 @Archivable
 class Button: Component {
-    //var type: ButtonType = .push
+    var type: ButtonType = .push
     var label: String = ""
     
     required init() {}
