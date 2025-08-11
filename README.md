@@ -67,3 +67,8 @@ print(json)
 var container = Archiver.jsonDecode(objType: Container.self, schema: [Container.self, Component.self, Button.self, Field.self], json: json)
 ```
 
+## Limitations
+
+### Synthesizing `decode()`
+
+`@Archivable` will synthesize a `decode()` for the class. If the class has a superclass the synthesized `decode()` function will include `override` (as required by Swift syntax) and include a call to `super.decode()` in its function. However it doesn't check if the superclass does in fact conform to `Archivable`, which is possible. A more complete check of the superclass should be added to the macro which synthesizes decode function.

@@ -21,7 +21,7 @@ public typealias ArchivableSchema = [String: ArchivableClass]
 
 public protocol Archivable: AnyObject {
     init()
-    func decode(from json: [String: Any], schema: ArchivableSchema) throws
+    func decode(from archive: [String: Any], schema: ArchivableSchema) throws
 }
 
 // MARK: - Archiver
@@ -78,8 +78,8 @@ public class Archiver {
                     }
                 // Enums
                 } else if valueMirror.displayStyle == .enum {
-                    if child.value is any RawRepresentable {
-                        value = child.value
+                    if let rawRepresentable = child.value as? any RawRepresentable {
+                        value = rawRepresentable.rawValue
                     } else {
                         value = String(describing: child.value)
                     }
@@ -130,7 +130,7 @@ public class Archiver {
             return value
         case let dict as [String: Any]:
             // The dict may be an object or it may be just a dict
-            if let className = dict[typeDiscriminator] as? String {
+            if dict[typeDiscriminator] is String {
                 // Object
                 return try decodeObject(from: dict, schema: schema)
             } else {
@@ -152,7 +152,7 @@ public class Archiver {
     public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> AnyObject {
         if let typeName = archive[typeDiscriminator] as? String,
            let type = schema[typeName] {
-            var obj = type.init()
+            let obj = type.init()
             try obj.decode(from: archive, schema: schema)
             return obj
         } else {

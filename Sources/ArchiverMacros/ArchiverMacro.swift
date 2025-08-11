@@ -12,6 +12,8 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
                                  attachedTo declaration: some SwiftSyntax.DeclGroupSyntax,
                                  providingExtensionsOf type: some SwiftSyntax.TypeSyntaxProtocol,
                                  conformingTo protocols: [SwiftSyntax.TypeSyntax], in context: some SwiftSyntaxMacros.MacroExpansionContext) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
+        let needsArchivableConformance = protocols.contains { $0.description.trimmingCharacters(in: .whitespaces) == "Archivable" }
+        guard needsArchivableConformance else { return [] }
         // Get the type's name from `type`
         let typeName = type.description
         let extensionDecl = ExtensionDeclSyntax(
@@ -54,6 +56,8 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             return nil
         }
 
+        // TODO: Add support for Enums, e.g. if let type = archive["type"] as? String, let type = ButtonType(rawValue: type)
+        
         let assignments = propertyNamesAndTypes.map { (name, type) in
             return """
             if let value = archive["\(name)"] {
@@ -61,7 +65,7 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             }
             """
         }.joined(separator: "\n")
-        
+
         // Superclass detection (simple version)
         let superclassType: String? = {
             guard let inheritance = classDecl.inheritanceClause else { return nil }
