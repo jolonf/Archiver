@@ -6,12 +6,12 @@ The key advantage of using Archiver over `Codable` is support for inheritance wh
 
 Archiver takes inspiration from a few existing approaches:
 - `NSKeyedArchiver` - Supports serialising subclasses and stores the type (class name) of each object.
-- Swift Data - Uses a macro `@Archivable` to synthesise `decode` methods. Requires a schema of all of the types used in the archive to determine subclasses for decoding.
+- Swift Data - Uses a macro `@Archivable` to synthesise `decode` methods. Requires a schema of all of the types used in the archive to instantiate the correct type when decoding.
 - `Codable` - Uses an `Archivable` protocol for decoding.
 
-The motivation for Archiver is for it to be a minimial implementation to support archiving and unarchiving objects. It is not designed to be conform to arbitrary formats. It is highly opinionated in that respect. Even though extra features could be added, the goal is to keep the implementation minimal as a demonstration of the minimum required to support archiving subclasses.
+The motivation for Archiver is for it to be a minimial implementation to support archiving and unarchiving objects. It is not designed to conform to arbitrary formats. It is highly opinionated in that respect. Even though extra features could be added, the goal is to keep the implementation minimal as a demonstration of the minimum required to support archiving subclasses.
 
-The Archiver produces a dictionary. This can then be converted to a file format. For example the dictionary can be passed to `JSONSerialization` to produce JSON, and it can unarchive from a JSON object produced by `JSONSerialization`. There are also convenience `jsonEncode` and `jsonDecode` functions provided.
+The Archiver produces a dictionary (similar to `NSKeyedArchiver`). This can then be converted to a file format. For example the dictionary can be passed to `JSONSerialization` to produce JSON, and it can unarchive from a JSON object produced by `JSONSerialization`. There are also convenience `jsonEncode` and `jsonDecode` functions provided.
 
 ## Usage
 
@@ -64,8 +64,25 @@ var json = Archiver.jsonEncode(container)
 print(json)
 
 // Unarchive from JSON
-var container = Archiver.jsonDecode(objType: Container.self, schema: [Container.self, Component.self, Button.self, Field.self], json: json)
+var container = Archiver.jsonDecode(objType: Container.self, schema: ArchivableSchema([Container.self, Component.self, Button.self, Field.self]), json: json)
 ```
+
+## Core Concepts
+
+`@Archivable` can be applied to `class`, `struct`, and `enum` types.
+
+The `Archivable` protocol requires that conformers implement `init` and `decode` functions. The `@Archivable` macro will synthesize the `decode` function, but you will need to provide the `init`.
+
+```swift
+public protocol Archivable {
+    init()
+    mutating func decode(from archive: [String: Any], schema: ArchivableSchema) throws
+}
+```
+
+Note that the `init` contains no parameters, the decoder assumes that it can create an instance with default values. The call to `decode` happens subsequently on the already created instance, which means that the properties must be mutable.
+
+Whenever an archive is decoded a schema must always be provided. The schema is similar in principle to that used by Swift Data. It is simply an array of all of the `Archivable` types that may be encountered whilst decoding.
 
 ## Limitations
 

@@ -71,7 +71,7 @@ final class ArchiverTests: XCTestCase {
         
         // JSON decode: build schema
         let schema: [Archivable.Type] = [Container.self, Component.self, Button.self, ButtonType.self, Field.self]
-        let decoded = try Archiver.jsonDecode(objType: Container.self, schema: schema, json: json)
+        let decoded = try Archiver.jsonDecode(objType: Container.self, schema: ArchivableSchema(schema), json: json)
         
         // Check root object
         XCTAssertEqual(decoded.title, "Test Container")

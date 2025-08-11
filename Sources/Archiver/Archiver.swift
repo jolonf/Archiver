@@ -15,7 +15,26 @@ public enum ArchiverError: Error {
     case unknownType(message: String = "")
 }
 
-public typealias ArchivableSchema = [String: Archivable.Type]
+public struct ArchivableSchema {
+    var schema: [String: Archivable.Type]
+    
+    public init(_ schema: [Archivable.Type]) {
+        self.schema = Self.createSchema(from: schema)
+    }
+    
+    public func type(forKey key: String) -> Archivable.Type? {
+        schema[key]
+    }
+    
+    public static func createSchema(from types: [Archivable.Type]) -> [String: Archivable.Type] {
+        var schema: [String: Archivable.Type] = [:]
+        for type in types {
+            let typeName = String(describing: type)
+            schema[typeName] = type
+        }
+        return schema
+    }
+}
 
 public protocol Archivable {
     init()
@@ -29,9 +48,9 @@ public class Archiver {
     
     // MARK: - JSON
     
-    public static func jsonDecode<T: Archivable>(objType: T.Type, schema types: [Archivable.Type], json: Data) throws -> T {
+    public static func jsonDecode<T: Archivable>(objType: T.Type, schema: ArchivableSchema, json: Data) throws -> T {
         let deser = try JSONSerialization.jsonObject(with: json)
-        let schema = createSchema(from: types)
+        //let schema = createSchema(from: types)
         switch deser {
         case let dict as [String: Any]:
             return try decode(type: objType, from: dict, schema: schema)
@@ -48,15 +67,12 @@ public class Archiver {
     // MARK: - Encode
 
     public static func encode(obj: Archivable) throws -> [String: Any] {
-        return try encode(objMirror: Mirror(reflecting: obj))
-    }
-
-    public static func encode(objMirror: Mirror) throws -> [String: Any] {
         var archive: [String: Any] = [:]
-        archive[typeDiscriminator] = String(describing: objMirror.subjectType)
-        try encode(properties: objMirror, archive: &archive)
+        let mirror = Mirror(reflecting: obj)
+        archive[typeDiscriminator] = String(describing: mirror.subjectType)
+        try encode(properties: mirror, archive: &archive)
         // Do the superclass
-        if let superclassMirror = objMirror.superclassMirror {
+        if let superclassMirror = mirror.superclassMirror {
             try encode(properties: superclassMirror, archive: &archive)
         }
         return archive
@@ -156,7 +172,7 @@ public class Archiver {
     /// Polymorphic decode
     public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> Archivable {
         if let typeName = archive[typeDiscriminator] as? String {
-            if let type = schema[typeName] {
+            if let type = schema.type(forKey: typeName) {
                 var obj = type.init()
                 try obj.decode(from: archive, schema: schema)
                 return obj
@@ -168,12 +184,5 @@ public class Archiver {
         }
     }
     
-    public static func createSchema(from types: [Archivable.Type]) -> ArchivableSchema {
-        var schema: ArchivableSchema = [:]
-        for type in types {
-            let typeName = String(describing: type)
-            schema[typeName] = type
-        }
-        return schema
-    }
+
 }
