@@ -91,6 +91,8 @@ public class Archiver {
 
     public static func encode(value: Any) throws -> Any {
         switch value {
+        case let value as Bool:
+            return value
         case let value as String:
             return value
         case let value as Int:
@@ -120,6 +122,8 @@ public class Archiver {
 
     public static func decode(from value: Any, schema: ArchivableSchema) throws -> Any {
         switch value {
+        case let value as Bool:
+            return value
         case let value as String:
             return value
         case let value as Int:
