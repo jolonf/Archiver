@@ -11,10 +11,13 @@ public macro Archivable() = #externalMacro(module: "ArchiverMacros", type: "Arch
 
 // MARK: - Types
 
-public enum ArchiverError: Error {
-    case unknownType(message: String = "")
+public protocol Archivable {
+    init()
+    mutating func decode(from archive: [String: Any], schema: ArchivableSchema) throws
 }
 
+/// String to Archivable type mapping.
+/// Used to map types stored in the archive to a Swift type which can be instantiated during decoding.
 public struct ArchivableSchema {
     var schema: [String: Archivable.Type]
     
@@ -36,36 +39,19 @@ public struct ArchivableSchema {
     }
 }
 
-public protocol Archivable {
-    init()
-    mutating func decode(from archive: [String: Any], schema: ArchivableSchema) throws
+public enum ArchiverError: Error {
+    case unknownType(message: String = "")
 }
 
 // MARK: - Archiver
 
 public class Archiver {
+    /// The key which contains the type name (e.g. class, struct, or enum name)
     public static let typeDiscriminator = "_$type"
-    
-    // MARK: - JSON
-    
-    public static func jsonDecode<T: Archivable>(objType: T.Type, schema: ArchivableSchema, json: Data) throws -> T {
-        let deser = try JSONSerialization.jsonObject(with: json)
-        //let schema = createSchema(from: types)
-        switch deser {
-        case let dict as [String: Any]:
-            return try decode(type: objType, from: dict, schema: schema)
-        default:
-            throw ArchiverError.unknownType(message: "Expected an object")
-        }
-    }
-    
-    public static func jsonEncode(_ obj: Archivable, options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]) throws -> Data {
-        let archive = try encode(obj: obj)
-        return try JSONSerialization.data(withJSONObject: archive, options: options)
-    }
 
     // MARK: - Encode
 
+    /// Encodes an object into a dictionary
     public static func encode(obj: Archivable) throws -> [String: Any] {
         var archive: [String: Any] = [:]
         let mirror = Mirror(reflecting: obj)
@@ -78,6 +64,9 @@ public class Archiver {
         return archive
     }
 
+    /// Encodes the properties of an object into a dictionary.
+    /// Called from `encode(obj:)`. This function exists separately because when we
+    /// encode superclasses we encode the properties to the same dictionary as the subclass.
     public static func encode(properties: Mirror, archive: inout [String: Any]) throws {
         try properties.children.forEach { (child: Mirror.Child) in
             if let label = child.label {
@@ -98,6 +87,7 @@ public class Archiver {
         }
     }
 
+    /// Encode a value to be stored in a dictionary entry.
     public static func encode(value: Any) throws -> Any {
         switch value {
         case let value as Bool:
@@ -139,6 +129,8 @@ public class Archiver {
         return try decode(from: value, schema: schema) as! T
     }
 
+    /// Decode any value that may occur in a dictionary entry.
+    /// Recursively decode arrays, dictionaries, and objects.
     public static func decode(from value: Any, schema: ArchivableSchema) throws -> Any {
         switch value {
         case let value as Bool:
@@ -169,7 +161,9 @@ public class Archiver {
         }
     }
     
-    /// Polymorphic decode
+    /// Polymorphic decode.
+    /// The type of the object is retrieved from the `typeDescriminator` key in the dictionary.
+    /// An instance is created by looking up the type name in the schema.
     public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> Archivable {
         if let typeName = archive[typeDiscriminator] as? String {
             if let type = schema.type(forKey: typeName) {
@@ -183,6 +177,4 @@ public class Archiver {
             throw ArchiverError.unknownType(message: "Dictionary does not contain key \(typeDiscriminator)")
         }
     }
-    
-
 }

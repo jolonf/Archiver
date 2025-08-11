@@ -82,6 +82,20 @@ public protocol Archivable {
 
 Note that the `init` contains no parameters, the decoder assumes that it can create an instance with default values. The call to `decode` happens subsequently on the already created instance, which means that the properties must be mutable.
 
+Enums must be `RawRepresentable` and the `init` must provide a default initialization, for example:
+
+```swift
+@Archivable
+enum ButtonType: String { // <-- String provides automatic RawRepresentable conformance
+    case push
+    case toggle
+    
+    public init() {
+        self = .push // <-- initialization required
+    }
+}
+```
+
 Whenever an archive is decoded a schema must always be provided. The schema is similar in principle to that used by Swift Data. It is simply an array of all of the `Archivable` types that may be encountered whilst decoding.
 
 ## Limitations

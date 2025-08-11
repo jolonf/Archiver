@@ -8,6 +8,10 @@ import SwiftSyntaxMacros
 /// - Synthesizes a `decode(from:schema:)` method that decodes the object's properties from a dictionary.
 public struct ArchivableMacro: MemberMacro, ExtensionMacro {
     
+    /// Extension macro expansion.
+    /// Creates an extension to conform to `Archivable`.
+    /// Will not create the extension if `protocols` contains `Archivable` as this means that conformance
+    /// has already been added, most likely in a superclass.
     public static func expansion(of node: SwiftSyntax.AttributeSyntax,
                                  attachedTo declaration: some SwiftSyntax.DeclGroupSyntax,
                                  providingExtensionsOf type: some SwiftSyntax.TypeSyntaxProtocol,
@@ -35,6 +39,10 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
     }
     
     /// Synthesize decode(from:schema:)
+    /// Has special cases for classes, structs, and enums.
+    /// - Subclasses will need to have `override` specified and a call to `super.decode`.
+    /// - Structs will need to have `mutating` specified.
+    /// - Enums will also need to have `mutating` specified and are a special case for decoding the raw value.
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf decl: some DeclGroupSyntax,
