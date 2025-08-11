@@ -15,11 +15,9 @@ public enum ArchiverError: Error {
     case unknownType(message: String = "")
 }
 
-public typealias ArchivableClass = (Archivable & AnyObject).Type
+public typealias ArchivableSchema = [String: Archivable.Type]
 
-public typealias ArchivableSchema = [String: ArchivableClass]
-
-public protocol Archivable: AnyObject {
+public protocol Archivable {
     init()
     func decode(from archive: [String: Any], schema: ArchivableSchema) throws
 }
@@ -31,7 +29,7 @@ public class Archiver {
     
     // MARK: - JSON
     
-    public static func jsonDecode<T: Archivable>(objType: T.Type, schema types: [ArchivableClass], json: Data) throws -> T {
+    public static func jsonDecode<T: Archivable>(objType: T.Type, schema types: [Archivable.Type], json: Data) throws -> T {
         let deser = try JSONSerialization.jsonObject(with: json)
         let schema = createSchema(from: types)
         switch deser {
@@ -149,7 +147,7 @@ public class Archiver {
     }
     
     /// Polymorphic decode
-    public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> AnyObject {
+    public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> Archivable {
         if let typeName = archive[typeDiscriminator] as? String,
            let type = schema[typeName] {
             let obj = type.init()
@@ -160,7 +158,7 @@ public class Archiver {
         }
     }
     
-    public static func createSchema(from types: [ArchivableClass]) -> ArchivableSchema {
+    public static func createSchema(from types: [Archivable.Type]) -> ArchivableSchema {
         var schema: ArchivableSchema = [:]
         for type in types {
             let typeName = String(describing: type)
