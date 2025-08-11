@@ -41,8 +41,39 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         // Synthesize decode(from:schema:)
-        guard let classDecl = decl.as(ClassDeclSyntax.self) else { return [] }
-        let propertyNamesAndTypes: [(String, String)] = classDecl.memberBlock.members.compactMap { (member) -> (String, String)? in
+        
+        var superCall = ""
+        var overrideStr = ""
+        var mutatingStr = ""
+        
+        let memberBlock: MemberBlockSyntax
+        
+        if let classDecl = decl.as(ClassDeclSyntax.self) {
+            memberBlock = classDecl.memberBlock
+            
+            // Superclass detection (simple version)
+            let superclassType: String? = {
+                guard let inheritance = classDecl.inheritanceClause else { return nil }
+                for inheritedType in inheritance.inheritedTypes {
+                    let supertype = inheritedType.type.description.trimmingCharacters(in: .whitespaces)
+                    if supertype != "Archivable" {
+                        return supertype
+                    }
+                }
+                return nil
+            }()
+            // Assume superclass conforms to Archivable if present and not NSObject
+            let hasArchivableSuper: Bool = (superclassType != nil && superclassType != "NSObject")
+            superCall = hasArchivableSuper ? "try super.decode(from: archive, schema: schema)\n" : ""
+            overrideStr = hasArchivableSuper ? "override " : ""
+        } else if let structDecl = decl.as(StructDeclSyntax.self) {
+            memberBlock = structDecl.memberBlock
+            mutatingStr = "mutating "
+        } else {
+            return []
+        }
+        
+        let propertyNamesAndTypes: [(String, String)] = memberBlock.members.compactMap { (member) -> (String, String)? in
             guard let varDecl = member.decl.as(VariableDeclSyntax.self),
                   let binding = varDecl.bindings.first,
                   let pattern = binding.pattern.as(IdentifierPatternSyntax.self),
@@ -66,23 +97,8 @@ public struct ArchivableMacro: MemberMacro, ExtensionMacro {
             """
         }.joined(separator: "\n")
 
-        // Superclass detection (simple version)
-        let superclassType: String? = {
-            guard let inheritance = classDecl.inheritanceClause else { return nil }
-            for inheritedType in inheritance.inheritedTypes {
-                let supertype = inheritedType.type.description.trimmingCharacters(in: .whitespaces)
-                if supertype != "Archivable" {
-                    return supertype
-                }
-            }
-            return nil
-        }()
-        // Assume superclass conforms to Archivable if present and not NSObject
-        let hasArchivableSuper: Bool = (superclassType != nil && superclassType != "NSObject")
-        let superCall = hasArchivableSuper ? "try super.decode(from: archive, schema: schema)\n" : ""
-        let overrideStr = hasArchivableSuper ? "override " : ""
         let decodeFunc = """
-        public \(overrideStr)func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
+        public \(mutatingStr)\(overrideStr)func decode(from archive: [String: Any], schema: ArchivableSchema) throws {
             \(superCall)\(assignments)
         }
         """

@@ -136,3 +136,7 @@ class Field: Component {
     required init() {}
 }
 
+@Archivable
+struct Preferences {
+    var reopenWindows: Bool = true
+}

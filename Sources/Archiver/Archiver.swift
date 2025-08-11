@@ -19,7 +19,7 @@ public typealias ArchivableSchema = [String: Archivable.Type]
 
 public protocol Archivable {
     init()
-    func decode(from archive: [String: Any], schema: ArchivableSchema) throws
+    mutating func decode(from archive: [String: Any], schema: ArchivableSchema) throws
 }
 
 // MARK: - Archiver
@@ -154,7 +154,7 @@ public class Archiver {
     public static func decodeObject(from archive: [String: Any], schema: ArchivableSchema) throws -> Archivable {
         if let typeName = archive[typeDiscriminator] as? String,
            let type = schema[typeName] {
-            let obj = type.init()
+            var obj = type.init()
             try obj.decode(from: archive, schema: schema)
             return obj
         } else {
